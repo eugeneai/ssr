@@ -2,5 +2,19 @@
 	<qresource prefix="/">
 		<file>header.png</file>
 		<file>about.htm</file>
+		<file>../icons/22/simplescreenrecorder-error.png</file>
+		<file>../icons/22/simplescreenrecorder-idle.png</file>
+		<file>../icons/22/simplescreenrecorder.png</file>
+		<file>../icons/22/simplescreenrecorder-paused.png</file>
+		<file>../icons/22/simplescreenrecorder-recording.png</file>
+		<file>../icons/other/all.xpm</file>
+		<file>../icons/other/dialog-error.png</file>
+		<file>../icons/other/dialog-information.png</file>
+		<file>../icons/other/emblem-importand.png</file>
+		<file>../icons/other/emblem-unreadable.png</file>
+		<file>../icons/other/media-playback-pause.png</file>
+		<file>../icons/other/media-playback-stop.png</file>
+		<file>../icons/other/media-record.png</file>
+		<file>../icons/other/process-stop.png</file>
 	</qresource>
 </RCC>
