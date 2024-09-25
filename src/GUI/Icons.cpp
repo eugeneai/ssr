@@ -27,11 +27,11 @@ QIcon g_icon_microphone;
 
 void LoadIcons() {
 
-	g_icon_ssr = QIcon::fromTheme("simplescreenrecorder");
-	g_icon_ssr_idle = QIcon::fromTheme("simplescreenrecorder-idle");
-	g_icon_ssr_error = QIcon::fromTheme("simplescreenrecorder-error");
-	g_icon_ssr_paused = QIcon::fromTheme("simplescreenrecorder-paused");
-	g_icon_ssr_recording = QIcon::fromTheme("simplescreenrecorder-recording");
+	g_icon_ssr = QIcon(":simplescreenrecorder.png");
+	g_icon_ssr_idle = QIcon(":simplescreenrecorder-idle.png");
+	g_icon_ssr_error = QIcon(":simplescreenrecorder-error.png");
+	g_icon_ssr_paused = QIcon(":simplescreenrecorder-paused.png");
+	g_icon_ssr_recording = QIcon(":simplescreenrecorder-recording.png");
 
 	g_icon_go_home = QIcon::fromTheme("go-home");
 	if(QApplication::layoutDirection() == Qt::RightToLeft) {
@@ -43,10 +43,10 @@ void LoadIcons() {
 	}
 	g_icon_folder_open = QIcon::fromTheme("folder-open");
 
-	g_icon_pause = QIcon::fromTheme("media-playback-pause");
-	g_icon_record = QIcon::fromTheme("media-record");
+	g_icon_pause = QIcon(":media-playback-pause");
+	g_icon_record = QIcon(":media-record");
 
-	g_icon_cancel = QIcon::fromTheme("process-stop");
+	g_icon_cancel = QIcon(":process-stop");
 	g_icon_save = QIcon::fromTheme("document-save");
 	g_icon_quit = QIcon::fromTheme("application-exit");
 
