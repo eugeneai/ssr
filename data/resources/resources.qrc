@@ -16,5 +16,12 @@
 		<file alias="media-playback-stop.png">../icons/other/media-playback-stop.png</file>
 		<file alias="media-record.png">../icons/other/media-record.png</file>
 		<file alias="process-stop.png">../icons/other/process-stop.png</file>
+		<file alias="application-exit.png">../icons/other/system-log-out.png</file>
+		<file alias="go-home.png">../icons/other/go-home.png</file>
+		<file alias="go-next.png">../icons/other/go-next.png</file>
+		<file alias="go-previous.png">../icons/other/go-previous.png</file>
+		<file alias="folder-open.png">../icons/other/folder-open.png</file>
+		<file alias="document-save.png">../icons/other/document-save.png</file>
+		<file alias="audio-input-microphone.png">../icons/other/audio-input-microphone.png</file>
 	</qresource>
 </RCC>

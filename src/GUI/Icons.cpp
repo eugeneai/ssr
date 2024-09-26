@@ -33,23 +33,23 @@ void LoadIcons() {
 	g_icon_ssr_paused = QIcon(":simplescreenrecorder-paused.png");
 	g_icon_ssr_recording = QIcon(":simplescreenrecorder-recording.png");
 
-	g_icon_go_home = QIcon::fromTheme("go-home");
+	g_icon_go_home = QIcon(":go-home.png");
 	if(QApplication::layoutDirection() == Qt::RightToLeft) {
-		g_icon_go_previous = QIcon::fromTheme("go-next");
-		g_icon_go_next = QIcon::fromTheme("go-previous");
+		g_icon_go_previous = QIcon(":go-next.png");
+		g_icon_go_next = QIcon(":go-previous.png");
 	} else {
-		g_icon_go_previous = QIcon::fromTheme("go-previous");
-		g_icon_go_next = QIcon::fromTheme("go-next");
+		g_icon_go_previous = QIcon(":go-previous.png");
+		g_icon_go_next = QIcon(":go-next.png");
 	}
-	g_icon_folder_open = QIcon::fromTheme("folder-open");
+	g_icon_folder_open = QIcon(":folder-open.png");
 
-	g_icon_pause = QIcon(":media-playback-pause");
-	g_icon_record = QIcon(":media-record");
+	g_icon_pause = QIcon(":media-playback-pause.png");
+	g_icon_record = QIcon(":media-record.png");
 
-	g_icon_cancel = QIcon(":process-stop");
-	g_icon_save = QIcon::fromTheme("document-save");
-	g_icon_quit = QIcon::fromTheme("application-exit");
+	g_icon_cancel = QIcon(":process-stop.png");
+	g_icon_save = QIcon(":document-save.png");
+	g_icon_quit = QIcon(":application-exit.png");
 
-	g_icon_microphone = QIcon::fromTheme("audio-input-microphone");
+	g_icon_microphone = QIcon(":audio-input-microphone.png");
 
 }
