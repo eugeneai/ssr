@@ -564,12 +564,19 @@ void PageRecord::SaveSettings(QSettings *settings) {
 }
 
 bool PageRecord::TryStartPage() {
-	if(m_page_started)
+	Logger::LogInfo("[PageRecord::TryStartPage] Called, m_page_started=" + QString::number(m_page_started));
+	if(m_page_started) {
+		Logger::LogInfo("[PageRecord::TryStartPage] Page already started, returning true");
 		return true;
-	if(!m_main_window->Validate())
+	}
+	if(!m_main_window->Validate()) {
+		Logger::LogInfo("[PageRecord::TryStartPage] Main window validation failed, returning false");
 		return false;
+	}
+	Logger::LogInfo("[PageRecord::TryStartPage] Going to record page");
 	m_main_window->GoPageRecord();
 	assert(m_page_started);
+	Logger::LogInfo("[PageRecord::TryStartPage] Page started, returning true");
 	return true;
 }
 
@@ -1363,21 +1370,32 @@ void PageRecord::OnUpdateRecordingFrame() {
 }
 
 void PageRecord::OnRecordStart() {
-	if(m_main_window->IsBusy())
+	Logger::LogInfo("[PageRecord::OnRecordStart] Called, output_started=" + QString::number(m_output_started) + ", output_paused=" + QString::number(m_output_paused));
+	if(m_main_window->IsBusy()) {
+		Logger::LogInfo("[PageRecord::OnRecordStart] Main window is busy, returning");
 		return;
-	if(!TryStartPage())
+	}
+	if(!TryStartPage()) {
+		Logger::LogInfo("[PageRecord::OnRecordStart] TryStartPage failed, returning");
 		return;
-	if(m_wait_saving)
+	}
+	if(m_wait_saving) {
+		Logger::LogInfo("[PageRecord::OnRecordStart] Waiting for save, returning");
 		return;
+	}
 	if(!m_output_started) {
+		Logger::LogInfo("[PageRecord::OnRecordStart] Starting output");
 		StartOutput();
 	} else if(m_output_paused) {
 		// Resume from pause
+		Logger::LogInfo("[PageRecord::OnRecordStart] Resuming from pause");
 		m_output_paused = false;
 		UpdateSysTray();
 		UpdateRecordButton();
 		UpdateInput();
 		OnUpdateRecordingFrame();
+	} else {
+		Logger::LogInfo("[PageRecord::OnRecordStart] Already recording and not paused, doing nothing");
 	}
 }
 
@@ -1747,21 +1765,22 @@ void PageRecord::OnNewLogLine(Logger::enum_type type, QString string) {
 
 // MQTT event handlers
 void PageRecord::OnMqttRecordingStart() {
-	Logger::LogInfo("[MQTT] Received recording start command");
-	if(!m_output_started) {
-		OnRecordStart();
-	}
+	Logger::LogInfo("[MQTT] Received recording start command, calling OnRecordStart");
+	OnRecordStart();
 }
 
 void PageRecord::OnMqttRecordingStop() {
-	Logger::LogInfo("[MQTT] Received recording stop command");
-	if(m_output_started) {
-		OnRecordSave(false); // Save and stop recording (false = no confirmation dialog)
+	Logger::LogInfo("[MQTT] Received recording stop command, output_started=" + QString::number(m_output_started) + ", output_paused=" + QString::number(m_output_paused));
+	if(m_output_started && !m_output_paused) {
+		Logger::LogInfo("[MQTT] Calling OnRecordPause");
+		OnRecordPause();
+	} else {
+		Logger::LogInfo("[MQTT] Not calling OnRecordPause - condition not met");
 	}
 }
 
 void PageRecord::OnMqttRecordingToggle() {
-	Logger::LogInfo("[MQTT] Received recording toggle command");
+	Logger::LogInfo("[MQTT] Received recording toggle command, calling OnRecordStartPause");
 	OnRecordStartPause();
 }
 
@@ -1781,16 +1800,22 @@ void PageRecord::OnMqttTopicChange(const QString& topic) {
 }
 
 void PageRecord::OnMqttPause() {
-	Logger::LogInfo("[MQTT] Received pause command");
+	Logger::LogInfo("[MQTT] Received pause command, output_started=" + QString::number(m_output_started) + ", output_paused=" + QString::number(m_output_paused));
 	if(m_output_started && !m_output_paused) {
+		Logger::LogInfo("[MQTT] Calling OnRecordPause");
 		OnRecordPause();
+	} else {
+		Logger::LogInfo("[MQTT] Not calling OnRecordPause - condition not met");
 	}
 }
 
 void PageRecord::OnMqttResume() {
-	Logger::LogInfo("[MQTT] Received resume command");
+	Logger::LogInfo("[MQTT] Received resume command, output_started=" + QString::number(m_output_started) + ", output_paused=" + QString::number(m_output_paused));
 	if(m_output_started && m_output_paused) {
+		Logger::LogInfo("[MQTT] Calling OnRecordPause to resume");
 		OnRecordPause(); // Toggle pause state
+	} else {
+		Logger::LogInfo("[MQTT] Not calling OnRecordPause - condition not met");
 	}
 }
 

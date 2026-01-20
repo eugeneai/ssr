@@ -661,6 +661,7 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 			}
 			// Check session ID if provided
 			QString session_id = json.value("session").toString();
+			Logger::LogInfo("[MQTT] Session check: session_id=" + session_id + ", m_instance_id=" + m_instance_id);
 			if (!session_id.isEmpty() && session_id != m_instance_id && session_id != "main") {
 				Logger::LogInfo("[MQTT] Ignoring message for different session: " + session_id + " (our session: " + m_instance_id + ")");
 				return;
@@ -679,10 +680,13 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 			} else if (relative_topic == "status/resume") {
 				emit RecordingResumeRequested();
 			} else if (relative_topic == "control/recording/start") {
+				Logger::LogInfo("[MQTT] Received control/recording/start command");
 				emit RecordingStartRequested();
 			} else if (relative_topic == "control/recording/stop") {
+				Logger::LogInfo("[MQTT] Received control/recording/stop command");
 				emit RecordingStopRequested();
 			} else if (relative_topic == "control/recording/toggle") {
+				Logger::LogInfo("[MQTT] Received control/recording/toggle command");
 				emit RecordingToggleRequested();
 			} else if (relative_topic == "control/client/connected") {
 				// Client connection notification, just log it
@@ -727,16 +731,20 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 
 		// Check session ID if provided
 		QString session_id = json.value("session").toString();
+		Logger::LogInfo("[MQTT] Session check (legacy): session_id=" + session_id + ", m_instance_id=" + m_instance_id);
 		if (!session_id.isEmpty() && session_id != m_instance_id && session_id != "main") {
 			Logger::LogInfo("[MQTT] Ignoring message for different session: " + session_id + " (our session: " + m_instance_id + ")");
 			return;
 		}
 
 		if (relative_topic == "control/recording/start") {
+			Logger::LogInfo("[MQTT] Received control/recording/start command (legacy)");
 			emit RecordingStartRequested();
 		} else if (relative_topic == "control/recording/stop") {
+			Logger::LogInfo("[MQTT] Received control/recording/stop command (legacy)");
 			emit RecordingStopRequested();
 		} else if (relative_topic == "control/recording/toggle") {
+			Logger::LogInfo("[MQTT] Received control/recording/toggle command (legacy)");
 			emit RecordingToggleRequested();
 		} else if (relative_topic == "control/topic/change") {
 			QString new_topic = json.value("topic").toString();
