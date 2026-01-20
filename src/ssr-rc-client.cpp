@@ -183,22 +183,25 @@ bool SSRRCClient::isConnected() const
 
 void SSRRCClient::startRecording()
 {
+    // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
     publishCommand("control/recording/start");
 }
 
 void SSRRCClient::stopRecording()
 {
+    // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
     publishCommand("control/recording/stop");
 }
 
 void SSRRCClient::toggleRecording()
 {
+    // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
     publishCommand("control/recording/toggle");
 }
 
 void SSRRCClient::requestStatus()
 {
-    publishCommand("control/client/status/get");
+    publishCommand("control/client/status/request");
 }
 
 void SSRRCClient::changeTopic(const QString& topic)
@@ -208,22 +211,22 @@ void SSRRCClient::changeTopic(const QString& topic)
 
 void SSRRCClient::pressButtonRecording()
 {
-    publishCommand("control/recording/start", "press");
+    publishCommand("device/button/recording", "press");
 }
 
 void SSRRCClient::releaseButtonRecording()
 {
-    publishCommand("control/recording/stop", "release");
+    publishCommand("device/button/recording", "release");
 }
 
 void SSRRCClient::pressButtonOnAir()
 {
-    publishCommand("control/recording/start", "press");
+    publishCommand("device/button/onair", "press");
 }
 
 void SSRRCClient::releaseButtonOnAir()
 {
-    publishCommand("control/recording/stop", "release");
+    publishCommand("device/button/onair", "release");
 }
 
 void SSRRCClient::onConnected()
@@ -351,8 +354,8 @@ void SSRRCClient::onReconnectTimer()
 
 void SSRRCClient::setupSubscriptions()
 {
-    // Subscribe to status topics
-    m_subStatus = m_client->subscribe(getFullTopic("status"));
+    // Subscribe to centralized status topics (matching MqttClient::SubscribeToTopicsByClient())
+    m_subStatus = m_client->subscribe(getFullTopic("control/status/response"), 1);
     if(m_subStatus) {
         connect(m_subStatus, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
@@ -360,7 +363,7 @@ void SSRRCClient::setupSubscriptions()
                 });
     }
 
-    m_subRecordingState = m_client->subscribe(getFullTopic("recording/state"));
+    m_subRecordingState = m_client->subscribe(getFullTopic("status/recording/started"), 1);
     if(m_subRecordingState) {
         connect(m_subRecordingState, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
@@ -368,7 +371,7 @@ void SSRRCClient::setupSubscriptions()
                 });
     }
 
-    m_subRecordingEvent = m_client->subscribe(getFullTopic("recording/event"));
+    m_subRecordingEvent = m_client->subscribe(getFullTopic("status/recording/stopped"), 1);
     if(m_subRecordingEvent) {
         connect(m_subRecordingEvent, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
@@ -376,15 +379,32 @@ void SSRRCClient::setupSubscriptions()
                 });
     }
 
-    m_subLedState = m_client->subscribe(getFullTopic("led/state"));
-    if(m_subLedState) {
-        connect(m_subLedState, &QMqttSubscription::messageReceived,
+    // Additional status topics from centralized architecture
+    QMqttSubscription* subRecordingPaused = m_client->subscribe(getFullTopic("status/recording/paused"), 1);
+    if(subRecordingPaused) {
+        connect(subRecordingPaused, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
                     onMessageReceived(msg.payload(), msg.topic());
                 });
     }
 
-    m_subError = m_client->subscribe(getFullTopic("error"));
+    QMqttSubscription* subSessionStarted = m_client->subscribe(getFullTopic("status/session/started"), 1);
+    if(subSessionStarted) {
+        connect(subSessionStarted, &QMqttSubscription::messageReceived,
+                this, [this](const QMqttMessage& msg) {
+                    onMessageReceived(msg.payload(), msg.topic());
+                });
+    }
+
+    QMqttSubscription* subSessionFinished = m_client->subscribe(getFullTopic("status/session/finished"), 1);
+    if(subSessionFinished) {
+        connect(subSessionFinished, &QMqttSubscription::messageReceived,
+                this, [this](const QMqttMessage& msg) {
+                    onMessageReceived(msg.payload(), msg.topic());
+                });
+    }
+
+    m_subError = m_client->subscribe(getFullTopic("events/error"), 1);
     if(m_subError) {
         connect(m_subError, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
@@ -429,14 +449,16 @@ QString SSRRCClient::getFullTopic(const QString& path)
 
 void SSRRCClient::clientDisconnected()
 {
-    publishCommand("client/disconnected", "{\"status\": \"disconnected\"}");
+    // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
+    publishCommand("control/client/disconnected", "{\"status\": \"disconnected\"}");
     Logger::LogInfo("Client disconnected");
     emit connectionStateChanged(false);
 }
 
 void SSRRCClient::clientConnected()
 {
-    publishCommand("client/connected", "{\"status\": \"connected\"}");
+    // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
+    publishCommand("control/client/connected", "{\"status\": \"connected\"}");
     Logger::LogInfo("Client connected");
     emit connectionStateChanged(true);
 }

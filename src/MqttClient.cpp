@@ -451,6 +451,11 @@ QString MqttClient::GetBaseTopic() const {
 	return GetFullTopic("");
 }
 
+void MqttClient::SubscribeToTopics() {
+	// Default implementation for recorder application
+	SubscribeToTopicsByRecorder();
+}
+
 void MqttClient::SubscribeToTopicsByRecorder() {
 	if (!m_connected) return;
 

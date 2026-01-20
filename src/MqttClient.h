@@ -114,6 +114,8 @@ public:
 private:
 	void SetupClient();
 	void SubscribeToTopics();
+	void SubscribeToTopicsByRecorder();
+	void SubscribeToTopicsByClient();
 	void UnsubscribeFromTopics();
 	void PublishConnectionState(bool connected);
 
