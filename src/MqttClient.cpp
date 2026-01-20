@@ -471,7 +471,7 @@ void MqttClient::SubscribeToTopicsByRecorder() {
 void MqttClient::SubscribeToTopicsByClient() {
 	if (!m_connected) return;
 
-	m_client->subscribe(GetCentralizedTopic("control/status/response"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/response"), 1);
 	m_client->subscribe(GetCentralizedTopic("status/recording/started"), 1);
 	m_client->subscribe(GetCentralizedTopic("status/recording/stopped"), 1);
 	m_client->subscribe(GetCentralizedTopic("status/recording/paused"), 1);
@@ -541,6 +541,8 @@ QString MqttClient::GenerateClientId() const {
 
 	return client_id;
 }
+
+
 
 QString MqttClient::GetCentralizedTopic(const QString& path) const {
 	QString topic = m_topic_root;
@@ -657,6 +659,12 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 			if (!doc.isNull() && doc.isObject()) {
 				json = doc.object();
 			}
+			// Check session ID if provided
+			QString session_id = json.value("session").toString();
+			if (!session_id.isEmpty() && session_id != m_instance_id && session_id != "main") {
+				Logger::LogInfo("[MQTT] Ignoring message for different session: " + session_id + " (our session: " + m_instance_id + ")");
+				return;
+			}
 
 			if (relative_topic == "status/state/get") {
 				emit StatusGetRequested();
@@ -670,6 +678,20 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 				emit RecordingPauseRequested();
 			} else if (relative_topic == "status/resume") {
 				emit RecordingResumeRequested();
+			} else if (relative_topic == "control/recording/start") {
+				emit RecordingStartRequested();
+			} else if (relative_topic == "control/recording/stop") {
+				emit RecordingStopRequested();
+			} else if (relative_topic == "control/recording/toggle") {
+				emit RecordingToggleRequested();
+			} else if (relative_topic == "control/client/connected") {
+				// Client connection notification, just log it
+				Logger::LogInfo("[MQTT] Remote client connected: " + json.value("status").toString());
+			} else if (relative_topic == "control/client/disconnected") {
+				// Client disconnection notification, just log it
+				Logger::LogInfo("[MQTT] Remote client disconnected: " + json.value("status").toString());
+			} else if (relative_topic == "control/client/status/request") {
+				emit StatusGetRequested();
 			} else if (relative_topic == "control/topic/set") {
 				QString new_topic = json.value("topic").toString();
 				if (new_topic.isEmpty()) {
@@ -701,6 +723,13 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 		QJsonObject json;
 		if (!doc.isNull() && doc.isObject()) {
 			json = doc.object();
+		}
+
+		// Check session ID if provided
+		QString session_id = json.value("session").toString();
+		if (!session_id.isEmpty() && session_id != m_instance_id && session_id != "main") {
+			Logger::LogInfo("[MQTT] Ignoring message for different session: " + session_id + " (our session: " + m_instance_id + ")");
+			return;
 		}
 
 		if (relative_topic == "control/recording/start") {

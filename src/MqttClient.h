@@ -111,6 +111,8 @@ public:
 	void PublishClientConnected();
 	void PublishClientDisconnected();
 
+
+
 private:
 	void SetupClient();
 	void SubscribeToTopics();

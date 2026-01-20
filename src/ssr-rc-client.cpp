@@ -184,49 +184,81 @@ bool SSRRCClient::isConnected() const
 void SSRRCClient::startRecording()
 {
     // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
-    publishCommand("control/recording/start");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    QJsonDocument doc(json);
+    publishCommand("control/recording/start", doc.toJson());
 }
 
 void SSRRCClient::stopRecording()
 {
     // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
-    publishCommand("control/recording/stop");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    QJsonDocument doc(json);
+    publishCommand("control/recording/stop", doc.toJson());
 }
 
 void SSRRCClient::toggleRecording()
 {
     // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
-    publishCommand("control/recording/toggle");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    QJsonDocument doc(json);
+    publishCommand("control/recording/toggle", doc.toJson());
 }
 
 void SSRRCClient::requestStatus()
 {
-    publishCommand("control/client/status/request");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    QJsonDocument doc(json);
+    publishCommand("control/client/status/request", doc.toJson());
 }
 
 void SSRRCClient::changeTopic(const QString& topic)
 {
-    publishCommand("control/topic/change", topic);
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["topic"] = topic;
+    QJsonDocument doc(json);
+    publishCommand("control/topic/change", doc.toJson());
 }
 
 void SSRRCClient::pressButtonRecording()
 {
-    publishCommand("device/button/recording", "press");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["action"] = "press";
+    QJsonDocument doc(json);
+    publishCommand("device/button/recording", doc.toJson());
 }
 
 void SSRRCClient::releaseButtonRecording()
 {
-    publishCommand("device/button/recording", "release");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["action"] = "release";
+    QJsonDocument doc(json);
+    publishCommand("device/button/recording", doc.toJson());
 }
 
 void SSRRCClient::pressButtonOnAir()
 {
-    publishCommand("device/button/onair", "press");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["action"] = "press";
+    QJsonDocument doc(json);
+    publishCommand("device/button/onair", doc.toJson());
 }
 
 void SSRRCClient::releaseButtonOnAir()
 {
-    publishCommand("device/button/onair", "release");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["action"] = "release";
+    QJsonDocument doc(json);
+    publishCommand("device/button/onair", doc.toJson());
 }
 
 void SSRRCClient::onConnected()
@@ -355,9 +387,18 @@ void SSRRCClient::onReconnectTimer()
 void SSRRCClient::setupSubscriptions()
 {
     // Subscribe to centralized status topics (matching MqttClient::SubscribeToTopicsByClient())
-    m_subStatus = m_client->subscribe(getFullTopic("control/status/response"), 1);
+    m_subStatus = m_client->subscribe(getFullTopic("status"), 1);
     if(m_subStatus) {
         connect(m_subStatus, &QMqttSubscription::messageReceived,
+                this, [this](const QMqttMessage& msg) {
+                    onMessageReceived(msg.payload(), msg.topic());
+                });
+    }
+
+    // Also subscribe to status/response topic for compatibility
+    QMqttSubscription* subStatusResponse = m_client->subscribe(getFullTopic("status/response"), 1);
+    if(subStatusResponse) {
+        connect(subStatusResponse, &QMqttSubscription::messageReceived,
                 this, [this](const QMqttMessage& msg) {
                     onMessageReceived(msg.payload(), msg.topic());
                 });
@@ -450,7 +491,11 @@ QString SSRRCClient::getFullTopic(const QString& path)
 void SSRRCClient::clientDisconnected()
 {
     // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
-    publishCommand("control/client/disconnected", "{\"status\": \"disconnected\"}");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["status"] = "disconnected";
+    QJsonDocument doc(json);
+    publishCommand("control/client/disconnected", doc.toJson());
     Logger::LogInfo("Client disconnected");
     emit connectionStateChanged(false);
 }
@@ -458,7 +503,11 @@ void SSRRCClient::clientDisconnected()
 void SSRRCClient::clientConnected()
 {
     // Publish to centralized control topic (matching what MqttClient::SubscribeToTopicsByRecorder() expects)
-    publishCommand("control/client/connected", "{\"status\": \"connected\"}");
+    QJsonObject json;
+    json["session"] = m_instanceId.isEmpty() ? "main" : m_instanceId;
+    json["status"] = "connected";
+    QJsonDocument doc(json);
+    publishCommand("control/client/connected", doc.toJson());
     Logger::LogInfo("Client connected");
     emit connectionStateChanged(true);
 }
