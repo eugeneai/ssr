@@ -1756,7 +1756,7 @@ void PageRecord::OnMqttRecordingStart() {
 void PageRecord::OnMqttRecordingStop() {
 	Logger::LogInfo("[MQTT] Received recording stop command");
 	if(m_output_started) {
-		OnRecordPause();
+		OnRecordSave(false); // Save and stop recording (false = no confirmation dialog)
 	}
 }
 
