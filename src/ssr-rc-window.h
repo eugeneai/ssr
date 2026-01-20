@@ -61,6 +61,7 @@ private slots:
     void onSettingsChanged();
     void onLoadMQTTSettings();
     void quitApplication();
+    void onDisconnectTimer();
 
 private:
     void setupUi();

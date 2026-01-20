@@ -64,6 +64,8 @@ public:
     void releaseButtonRecording();
     void pressButtonOnAir();
     void releaseButtonOnAir();
+    void clientConnected();
+    void clientDisconnected();
 
     // Getters
     QString getBrokerHost() const { return m_brokerHost; }

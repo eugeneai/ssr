@@ -44,10 +44,10 @@ static void signalHandler(int signal)
         case SIGTERM: signalName = "SIGTERM"; break;
         default: signalName = "UNKNOWN"; break;
     }
-    
+
     // Write directly to stderr since Logger might not be safe in signal context
     fprintf(stderr, "\nReceived signal %s (%d), initiating shutdown...\n", signalName, signal);
-    
+
     // Use QTimer to safely quit the application from main thread
     if(g_app) {
         // This is safe because QTimer::singleShot uses the event loop
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     g_app = &app;
-    
+
     // Set up signal handlers for graceful shutdown
     std::signal(SIGINT, signalHandler);
     std::signal(SIGTERM, signalHandler);

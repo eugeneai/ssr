@@ -183,47 +183,47 @@ bool SSRRCClient::isConnected() const
 
 void SSRRCClient::startRecording()
 {
-    publishCommand("recording/start");
+    publishCommand("control/recording/start");
 }
 
 void SSRRCClient::stopRecording()
 {
-    publishCommand("recording/stop");
+    publishCommand("control/recording/stop");
 }
 
 void SSRRCClient::toggleRecording()
 {
-    publishCommand("recording/toggle");
+    publishCommand("control/recording/toggle");
 }
 
 void SSRRCClient::requestStatus()
 {
-    publishCommand("status/get");
+    publishCommand("control/client/status/get");
 }
 
 void SSRRCClient::changeTopic(const QString& topic)
 {
-    publishCommand("topic/change", topic);
+    publishCommand("control/topic/change", topic);
 }
 
 void SSRRCClient::pressButtonRecording()
 {
-    publishCommand("button/recording", "press");
+    publishCommand("control/recording/start", "press");
 }
 
 void SSRRCClient::releaseButtonRecording()
 {
-    publishCommand("button/recording", "release");
+    publishCommand("control/recording/stop", "release");
 }
 
 void SSRRCClient::pressButtonOnAir()
 {
-    publishCommand("button/onair", "press");
+    publishCommand("control/recording/start", "press");
 }
 
 void SSRRCClient::releaseButtonOnAir()
 {
-    publishCommand("button/onair", "release");
+    publishCommand("control/recording/stop", "release");
 }
 
 void SSRRCClient::onConnected()
@@ -425,4 +425,18 @@ QString SSRRCClient::getFullTopic(const QString& path)
     }
 
     return topic;
+}
+
+void SSRRCClient::clientDisconnected()
+{
+    publishCommand("client/disconnected", "{\"status\": \"disconnected\"}");
+    Logger::LogInfo("Client disconnected");
+    emit connectionStateChanged(false);
+}
+
+void SSRRCClient::clientConnected()
+{
+    publishCommand("client/connected", "{\"status\": \"connected\"}");
+    Logger::LogInfo("Client connected");
+    emit connectionStateChanged(true);
 }

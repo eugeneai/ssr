@@ -266,7 +266,7 @@ void SSRRCWindow::loadSettings()
 
     // Auto-connect if enabled
     if(m_autoConnectCheck->isChecked()) {
-        QTimer::singleShot(1000, this, &SSRRCWindow::onConnectClicked);
+        QTimer::singleShot(300, this, &SSRRCWindow::onConnectClicked);
     }
 }
 
@@ -373,16 +373,16 @@ void SSRRCWindow::closeEvent(QCloseEvent* event)
         msgBox.setWindowTitle("SSR Remote Control");
         msgBox.setText("What would you like to do?");
         msgBox.setIcon(QMessageBox::Question);
-        
+
         QPushButton *minimizeButton = msgBox.addButton("Minimize to Tray", QMessageBox::YesRole);
         QPushButton *quitButton = msgBox.addButton("Exit Application", QMessageBox::NoRole);
         QPushButton *cancelButton = msgBox.addButton("Cancel", QMessageBox::RejectRole);
-        
+
         msgBox.setDefaultButton(minimizeButton);
         msgBox.exec();
-        
+
         QAbstractButton *clickedButton = msgBox.clickedButton();
-        
+
         if(clickedButton == minimizeButton) {
             // Minimize to tray
             Logger::LogInfo("Minimizing to system tray");
@@ -418,12 +418,21 @@ void SSRRCWindow::onConnectClicked()
 
     Logger::LogInfo(QString("Connecting to MQTT broker: %1:%2").arg(m_hostEdit->text()).arg(m_portEdit->text()));
     m_mqttClient->connectToBroker();
+    m_mqttClient->clientConnected();
 }
 
 void SSRRCWindow::onDisconnectClicked()
 {
+    m_mqttClient->clientDisconnected();
+    QTimer::singleShot(300, this, &SSRRCWindow::onDisconnectTimer);
     Logger::LogInfo("Disconnecting from MQTT broker");
+}
+
+void SSRRCWindow::onDisconnectTimer()
+{
+    Logger::LogInfo("Client disconnected");
     m_mqttClient->disconnectFromBroker();
+    updateUiState();
 }
 
 void SSRRCWindow::onStartRecordingClicked()

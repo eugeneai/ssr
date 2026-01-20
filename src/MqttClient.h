@@ -74,6 +74,9 @@ private:
 	QMqttSubscription* m_sub_button_recording;
 	QMqttSubscription* m_sub_button_onair;
 	QMqttSubscription* m_sub_status_get;
+	QMqttSubscription* m_sub_client_connected;
+	QMqttSubscription* m_sub_client_disconnected;
+	QMqttSubscription* m_sub_client_status;
 
 	// Configuration
 	QString m_topic_root;
@@ -105,6 +108,8 @@ public:
 	void PublishLedState(const QString& led, bool state);
 	void PublishError(const QString& error);
 	void PublishFullStatus(bool recording, const QString& session_id = QString(), const QString& topic = QString());
+	void PublishClientConnected();
+	void PublishClientDisconnected();
 
 private:
 	void SetupClient();

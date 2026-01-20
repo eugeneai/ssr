@@ -54,7 +54,10 @@ MqttClient::MqttClient(PageRecord* page_record)
 	  m_sub_topic_change(nullptr),
 	  m_sub_button_recording(nullptr),
 	  m_sub_button_onair(nullptr),
-	  m_sub_status_get(nullptr) {
+	  m_sub_status_get(nullptr),
+	  m_sub_client_connected(nullptr),
+	  m_sub_client_disconnected(nullptr),
+	  m_sub_client_status(nullptr) {
 
 	m_client_id = GenerateClientId();
 
@@ -367,6 +370,22 @@ void MqttClient::PublishFullStatus(bool recording, const QString& session_id, co
 	}
 }
 
+void MqttClient::PublishClientConnected() {
+	if (m_client->state() == QMqttClient::Disconnected) {
+		QString topic = GetBaseTopic() + "client/connected";
+		m_client->publish(topic, "{\"status\": \"connected\"}", 1, true);
+		Logger::LogInfo("[MQTT] Client connected event published successfully");
+	}
+}
+
+void MqttClient::PublishClientDisconnected() {
+	if (m_client->state() == QMqttClient::Connected) {
+		QString topic = GetBaseTopic() + "client/disconnected";
+		m_client->publish(topic, "{\"status\": \"disconnected\"}", 1, true);
+		Logger::LogInfo("[MQTT] Client disconnected event published successfully");
+	}
+}
+
 void MqttClient::SetupClient() {
 	// Disable proxy at application level for MQTT connections
 	// This is needed because Qt uses system proxy settings which interfere with MQTT
@@ -432,19 +451,28 @@ QString MqttClient::GetBaseTopic() const {
 	return GetFullTopic("");
 }
 
-void MqttClient::SubscribeToTopics() {
+void MqttClient::SubscribeToTopicsByRecorder() {
 	if (!m_connected) return;
 
-	// Subscribe to centralized control topics
-	m_sub_status_get = m_client->subscribe(GetCentralizedTopic("control/status/get"), 1);
-
 	// Subscribe to additional centralized control topics
-	m_client->subscribe(GetCentralizedTopic("control/start"), 1);
-	m_client->subscribe(GetCentralizedTopic("control/stop"), 1);
-	m_client->subscribe(GetCentralizedTopic("control/toggle"), 1);
-	m_client->subscribe(GetCentralizedTopic("control/pause"), 1);
-	m_client->subscribe(GetCentralizedTopic("control/resume"), 1);
-	m_client->subscribe(GetCentralizedTopic("control/topic/set"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/recording/start"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/recording/stop"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/recording/toggle"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/client/connected"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/client/disconnected"), 1);
+	m_client->subscribe(GetCentralizedTopic("control/client/status/request"), 1);
+}
+
+void MqttClient::SubscribeToTopicsByClient() {
+	if (!m_connected) return;
+
+	m_client->subscribe(GetCentralizedTopic("control/status/response"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/recording/started"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/recording/stopped"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/recording/paused"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/session/finished"), 1);
+	m_client->subscribe(GetCentralizedTopic("status/session/started"), 1);
+
 }
 
 void MqttClient::UnsubscribeFromTopics() {
@@ -625,17 +653,17 @@ void MqttClient::OnClientMessageReceived(const QByteArray& message, const QMqttT
 				json = doc.object();
 			}
 
-			if (relative_topic == "control/status/get") {
+			if (relative_topic == "status/state/get") {
 				emit StatusGetRequested();
-			} else if (relative_topic == "control/start") {
+			} else if (relative_topic == "status/start") {
 				emit RecordingStartRequested();
-			} else if (relative_topic == "control/stop") {
+			} else if (relative_topic == "status/stop") {
 				emit RecordingStopRequested();
-			} else if (relative_topic == "control/toggle") {
+			} else if (relative_topic == "status/toggle") {
 				emit RecordingToggleRequested();
-			} else if (relative_topic == "control/pause") {
+			} else if (relative_topic == "status/pause") {
 				emit RecordingPauseRequested();
-			} else if (relative_topic == "control/resume") {
+			} else if (relative_topic == "status/resume") {
 				emit RecordingResumeRequested();
 			} else if (relative_topic == "control/topic/set") {
 				QString new_topic = json.value("topic").toString();
