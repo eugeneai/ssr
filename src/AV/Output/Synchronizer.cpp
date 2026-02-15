@@ -311,11 +311,21 @@ void Synchronizer::NewSegment(bool is_pause) {
 }
 
 void Synchronizer::Pause() {
+	Logger::LogInfo("[Synchronizer::Pause] Setting paused=true");
 	m_paused = true;
 }
 
 void Synchronizer::Resume() {
+	Logger::LogInfo("[Synchronizer::Resume] Setting paused=false and resetting segment started flags");
 	m_paused = false;
+	SharedLock lock(&m_shared_data);
+	// Reset segment started flags so that ReadVideoFrame/ReadAudioSamples
+	// will start new segments with correct timestamps when resuming
+	lock->m_segment_video_started = false;
+	lock->m_segment_audio_started = false;
+	Logger::LogInfo(QString("[Synchronizer::Resume] After reset: video_started=%1, audio_started=%2")
+		.arg(lock->m_segment_video_started)
+		.arg(lock->m_segment_audio_started));
 }
 
 int64_t Synchronizer::GetTotalTime() {
@@ -336,6 +346,10 @@ int64_t Synchronizer::GetNextVideoTimestamp() {
 
 void Synchronizer::ReadVideoFrame(unsigned int width, unsigned int height, const uint8_t* const* data, const int* stride, AVPixelFormat format, int colorspace, int64_t timestamp) {
 	assert(m_output_format->m_video_enabled);
+	
+	Logger::LogInfo(QString("[Synchronizer::ReadVideoFrame] Received video frame at timestamp %1, paused=%2")
+		.arg(timestamp)
+		.arg(m_paused.load()));
 
 	// add new block to sync diagram
 	if(m_sync_diagram != NULL)
@@ -386,6 +400,7 @@ void Synchronizer::ReadVideoFrame(unsigned int width, unsigned int height, const
 
 	// start video
 	if(!lock->m_segment_video_started) {
+		Logger::LogInfo(QString("[Synchronizer::ReadVideoFrame] Starting video segment at timestamp %1").arg(timestamp));
 		lock->m_segment_video_started = true;
 		lock->m_segment_video_start_time = timestamp;
 		lock->m_segment_video_stop_time = timestamp;
@@ -632,19 +647,53 @@ double Synchronizer::GetAudioDrift(AudioData* audiolock, unsigned int extra_samp
 }
 
 void Synchronizer::NewSegment(SharedData* lock, bool is_pause) {
+	Logger::LogInfo(QString("[Synchronizer::NewSegment] Called with is_pause=%1, video_started=%2, audio_started=%3")
+		.arg(is_pause)
+		.arg(lock->m_segment_video_started)
+		.arg(lock->m_segment_audio_started));
 	FlushBuffers(lock);
 	if(lock->m_segment_video_started && lock->m_segment_audio_started) {
 		int64_t segment_start_time, segment_stop_time;
 		GetSegmentStartStop(lock, &segment_start_time, &segment_stop_time);
-		lock->m_time_offset += std::max((int64_t) 0, segment_stop_time - segment_start_time);
+		int64_t segment_duration = std::max((int64_t) 0, segment_stop_time - segment_start_time);
+		lock->m_time_offset += segment_duration;
+		Logger::LogInfo(QString("[Synchronizer::NewSegment] Increased time_offset by %1, new time_offset=%2")
+			.arg(segment_duration)
+			.arg(lock->m_time_offset));
 	}
 	lock->m_video_buffer.clear();
 	lock->m_audio_buffer.Clear();
 	lock->m_last_video_frame_data.reset(); // Reset last video frame data for new segment
-	InitSegment(lock);
+	
+	if(is_pause) {
+		// When pausing, mark streams as started to prevent ReadVideoFrame/ReadAudioSamples
+		// from starting new segments with wrong timestamps if frames arrive between
+		// NewSegment() and Pause() calls (race condition)
+		lock->m_segment_video_started = true;
+		lock->m_segment_audio_started = true;
+		lock->m_segment_video_start_time = AV_NOPTS_VALUE;
+		lock->m_segment_audio_start_time = AV_NOPTS_VALUE;
+		lock->m_segment_video_stop_time = AV_NOPTS_VALUE;
+		lock->m_segment_audio_stop_time = AV_NOPTS_VALUE;
+		lock->m_segment_audio_can_drop = true;
+		lock->m_segment_audio_samples_read = 0;
+		lock->m_segment_video_accumulated_delay = 0;
+		// DO NOT reset video_pts and audio_samples - preserve them for resume
+		Logger::LogInfo(QString("[Synchronizer::NewSegment] Pause mode: video_started=%1, audio_started=%2, video_pts=%3, audio_samples=%4")
+			.arg(lock->m_segment_video_started)
+			.arg(lock->m_segment_audio_started)
+			.arg(lock->m_video_pts)
+			.arg(lock->m_audio_samples));
+	} else {
+		// Normal segment end (file split or stop) - reset everything
+		InitSegment(lock);
+	}
 }
 
 void Synchronizer::InitSegment(SharedData* lock) {
+	Logger::LogInfo(QString("[Synchronizer::InitSegment] Resetting segment state. video_enabled=%1, audio_enabled=%2")
+		.arg(m_output_format->m_video_enabled)
+		.arg(m_output_format->m_audio_enabled));
 	lock->m_segment_video_started = !m_output_format->m_video_enabled;
 	lock->m_segment_audio_started = !m_output_format->m_audio_enabled;
 	lock->m_segment_video_start_time = AV_NOPTS_VALUE;
@@ -654,9 +703,13 @@ void Synchronizer::InitSegment(SharedData* lock) {
 	lock->m_segment_audio_can_drop = true;
 	lock->m_segment_audio_samples_read = 0;
 	lock->m_segment_video_accumulated_delay = 0;
-	// Reset video and audio positions for new segment to prevent frame dropping
-	lock->m_video_pts = 0;
-	lock->m_audio_samples = 0;
+	// DO NOT reset video_pts and audio_samples here - they need to be preserved across pause/resume
+	// These are only reset when starting a completely new recording
+	Logger::LogInfo(QString("[Synchronizer::InitSegment] After reset: video_started=%1, audio_started=%2, video_pts=%3, audio_samples=%4")
+		.arg(lock->m_segment_video_started)
+		.arg(lock->m_segment_audio_started)
+		.arg(lock->m_video_pts)
+		.arg(lock->m_audio_samples));
 }
 
 int64_t Synchronizer::GetTotalTime(Synchronizer::SharedData* lock) {
@@ -677,24 +730,46 @@ void Synchronizer::GetSegmentStartStop(SharedData* lock, int64_t* segment_start_
 		*segment_start_time = lock->m_segment_audio_start_time;
 		*segment_stop_time = lock->m_segment_audio_stop_time;
 	} else {
-		*segment_start_time = std::max(lock->m_segment_video_start_time, lock->m_segment_audio_start_time);
-		*segment_stop_time = std::min(lock->m_segment_video_stop_time, lock->m_segment_audio_stop_time);
+		// Handle case where only one stream has started
+		if(lock->m_segment_video_start_time == AV_NOPTS_VALUE) {
+			// Video hasn't started yet, use audio times
+			*segment_start_time = lock->m_segment_audio_start_time;
+			*segment_stop_time = lock->m_segment_audio_stop_time;
+		} else if(lock->m_segment_audio_start_time == AV_NOPTS_VALUE) {
+			// Audio hasn't started yet, use video times
+			*segment_start_time = lock->m_segment_video_start_time;
+			*segment_stop_time = lock->m_segment_video_stop_time;
+		} else {
+			// Both have started
+			*segment_start_time = std::max(lock->m_segment_video_start_time, lock->m_segment_audio_start_time);
+			*segment_stop_time = std::min(lock->m_segment_video_stop_time, lock->m_segment_audio_stop_time);
+		}
 	}
 }
 
 void Synchronizer::FlushBuffers(SharedData* lock) {
-	if(!lock->m_segment_video_started || !lock->m_segment_audio_started || m_paused)
+	if(m_paused) {
+		Logger::LogInfo(QString("[Synchronizer::FlushBuffers] Skipping because paused=%1")
+			.arg(m_paused.load()));
 		return;
+	}
+
+	// Don't require both video and audio to be started
+	// This allows flushing when only one stream has started (e.g., after pause)
+	if(!lock->m_segment_video_started && !lock->m_segment_audio_started) {
+		Logger::LogInfo(QString("[Synchronizer::FlushBuffers] Skipping: neither video nor audio started"));
+		return;
+	}
 
 	int64_t segment_start_time, segment_stop_time;
 	GetSegmentStartStop(lock, &segment_start_time, &segment_stop_time);
 
-	// flush video
-	if(m_output_format->m_video_enabled)
+	// flush video if started
+	if(m_output_format->m_video_enabled && lock->m_segment_video_started)
 		FlushVideoBuffer(lock, segment_start_time, segment_stop_time);
 
-	// flush audio
-	if(m_output_format->m_audio_enabled)
+	// flush audio if started
+	if(m_output_format->m_audio_enabled && lock->m_segment_audio_started)
 		FlushAudioBuffer(lock, segment_start_time, segment_stop_time);
 
 }
@@ -721,6 +796,12 @@ void Synchronizer::FlushVideoBuffer(Synchronizer::SharedData* lock, int64_t segm
 		// get/predict the timestamp of the next frame
 		int64_t next_timestamp = (lock->m_video_buffer.empty())? lock->m_segment_video_stop_time - (int64_t) (1000000 / m_output_format->m_video_frame_rate) : lock->m_video_buffer.front()->GetFrame()->pts;
 		int64_t next_pts = (lock->m_time_offset + (next_timestamp - segment_start_time)) * (int64_t) m_output_format->m_video_frame_rate / (int64_t) 1000000;
+		Logger::LogInfo(QString("[Synchronizer::FlushVideoBuffer] Calculating PTS: time_offset=%1, next_timestamp=%2, segment_start_time=%3, next_pts=%4, video_pts=%5")
+			.arg(lock->m_time_offset)
+			.arg(next_timestamp)
+			.arg(segment_start_time)
+			.arg(next_pts)
+			.arg(lock->m_video_pts));
 
 		// if the frame is too late, decrease the pts by one to avoid gaps
 		if(next_pts > lock->m_video_pts)
@@ -782,7 +863,8 @@ void Synchronizer::FlushVideoBuffer(Synchronizer::SharedData* lock, int64_t segm
 		// send the frame to the encoder
 		lock->m_segment_video_accumulated_delay = std::max((int64_t) 0, lock->m_segment_video_accumulated_delay - (frame->GetFrame()->pts - lock->m_video_pts) * delay_time_per_frame);
 		lock->m_video_pts = frame->GetFrame()->pts + 1;
-		//Logger::LogInfo("[Synchronizer::FlushBuffers] Encoded video frame [" + QString::number(frame->GetFrame()->pts) + "].");
+		Logger::LogInfo(QString("[Synchronizer::FlushVideoBuffer] Sending video frame with pts=%1 to encoder")
+			.arg(frame->GetFrame()->pts));
 		m_output_manager->AddVideoFrame(std::move(frame));
 		lock->m_segment_video_accumulated_delay += m_output_manager->GetVideoFrameDelay();
 

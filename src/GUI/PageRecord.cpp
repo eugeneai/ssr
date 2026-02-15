@@ -1187,6 +1187,10 @@ void PageRecord::UpdateInput() {
 
 	if((m_output_started && !m_output_paused) || m_previewing) {
 		StartInput();
+	} else if(m_output_started && m_output_paused) {
+		// When paused, don't stop input completely, just disconnect from synchronizer
+		// This allows quick resumption without recreating input objects
+		Logger::LogInfo("[PageRecord::UpdateInput] Paused - keeping input objects alive");
 	} else {
 		StopInput();
 	}
@@ -1194,8 +1198,10 @@ void PageRecord::UpdateInput() {
 	// get sources
 	VideoSource *video_source = NULL;
 	AudioSource *audio_source = NULL;
-	if(m_video_backend == PageInput::VIDEO_BACKEND_X11)
+	if(m_video_backend == PageInput::VIDEO_BACKEND_X11) {
 		video_source = m_x11_input.get();
+		Logger::LogInfo(QString("[PageRecord::UpdateInput] X11 video source: %1").arg(video_source ? "not null" : "NULL"));
+	}
 #if SSR_USE_OPENGL_RECORDING
 	if(m_video_backend == PageInput::VIDEO_BACKEND_GLINJECT)
 		video_source = m_gl_inject_input.get();
@@ -1226,9 +1232,13 @@ void PageRecord::UpdateInput() {
 	// connect sinks
 	if(m_output_manager != NULL) {
 		if(m_output_started && !m_output_paused) {
+			Logger::LogInfo(QString("[PageRecord::UpdateInput] Connecting sources to synchronizer: output_started=%1, output_paused=%2")
+				.arg(m_output_started).arg(m_output_paused));
 			m_output_manager->GetSynchronizer()->ConnectVideoSource(video_source, PRIORITY_RECORD);
 			m_output_manager->GetSynchronizer()->ConnectAudioSource(audio_source, PRIORITY_RECORD);
 		} else {
+			Logger::LogInfo(QString("[PageRecord::UpdateInput] Disconnecting sources from synchronizer: output_started=%1, output_paused=%2")
+				.arg(m_output_started).arg(m_output_paused));
 			// Reset last video frame before disconnecting to prevent duplicate frame insertion during pause
 			if(m_output_manager->GetOutputFormat()->m_video_enabled) {
 				m_output_manager->GetSynchronizer()->ResetLastVideoFrame();
@@ -1404,7 +1414,12 @@ void PageRecord::OnRecordStart() {
 		m_output_paused = false;
 		// Resume synchronizer to allow recording again
 		if(m_output_manager && m_output_manager->GetSynchronizer()) {
+			Logger::LogInfo("[PageRecord::OnRecordStart] Calling synchronizer->Resume()");
 			m_output_manager->GetSynchronizer()->Resume();
+		} else {
+			Logger::LogInfo(QString("[PageRecord::OnRecordStart] Cannot resume: output_manager=%1, synchronizer=%2")
+				.arg(m_output_manager ? "not null" : "null")
+				.arg((m_output_manager && m_output_manager->GetSynchronizer()) ? "not null" : "null"));
 		}
 		UpdateSysTray();
 		UpdateRecordButton();
@@ -1416,6 +1431,8 @@ void PageRecord::OnRecordStart() {
 }
 
 void PageRecord::OnRecordPause() {
+	Logger::LogInfo(QString("[PageRecord::OnRecordPause] Called. output_started=%1, output_paused=%2")
+		.arg(m_output_started).arg(m_output_paused));
 	if(m_main_window->IsBusy())
 		return;
 	if(!m_page_started)
@@ -1425,6 +1442,8 @@ void PageRecord::OnRecordPause() {
 	if(m_output_started) {
 		// Toggle pause state
 		m_output_paused = !m_output_paused;
+		Logger::LogInfo(QString("[PageRecord::OnRecordPause] Toggled pause state. New output_paused=%1")
+			.arg(m_output_paused));
 		StopOutput(false);
 		
 		// Publish appropriate MQTT event
@@ -1439,15 +1458,28 @@ void PageRecord::OnRecordPause() {
 }
 
 void PageRecord::OnRecordStartPause() {
+	Logger::LogInfo(QString("[PageRecord::OnRecordStartPause] Called. page_started=%1, output_started=%2, output_paused=%3")
+		.arg(m_page_started).arg(m_output_started).arg(m_output_paused));
 	if(m_page_started && m_output_started) {
-		OnRecordPause();
+		if(m_output_paused) {
+			// Recording is paused - resume it
+			Logger::LogInfo("[PageRecord::OnRecordStartPause] Recording is paused, resuming");
+			OnRecordStart();
+		} else {
+			// Recording is active - pause it
+			Logger::LogInfo("[PageRecord::OnRecordStartPause] Recording is active, pausing");
+			OnRecordPause();
+		}
 	} else {
+		// Recording not started - start it
+		Logger::LogInfo("[PageRecord::OnRecordStartPause] Recording not started, starting");
 		OnRecordStart();
 	}
 }
 
 
 void PageRecord::OnRecordCancel(bool confirm) {
+	Logger::LogInfo("[PageRecord::OnRecordCancel] Called");
 	if(m_main_window->IsBusy())
 		return;
 	if(!m_page_started)
