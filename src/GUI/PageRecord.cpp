@@ -999,7 +999,7 @@ void PageRecord::StopOutput(bool final) {
 	
 	// For pause: first flush remaining data from synchronizer buffers
 	if(!final && m_output_manager && m_output_manager->GetSynchronizer()) {
-		// NewSegment with is_pause=true will flush buffers without increasing time offset
+		// NewSegment with is_pause=true will flush buffers and increase time offset
 		m_output_manager->GetSynchronizer()->NewSegment(true);
 		// Then pause to prevent further flushing
 		m_output_manager->GetSynchronizer()->Pause();

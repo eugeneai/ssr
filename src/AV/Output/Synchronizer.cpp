@@ -633,7 +633,7 @@ double Synchronizer::GetAudioDrift(AudioData* audiolock, unsigned int extra_samp
 
 void Synchronizer::NewSegment(SharedData* lock, bool is_pause) {
 	FlushBuffers(lock);
-	if(!is_pause && lock->m_segment_video_started && lock->m_segment_audio_started) {
+	if(lock->m_segment_video_started && lock->m_segment_audio_started) {
 		int64_t segment_start_time, segment_stop_time;
 		GetSegmentStartStop(lock, &segment_start_time, &segment_stop_time);
 		lock->m_time_offset += std::max((int64_t) 0, segment_stop_time - segment_start_time);
@@ -654,6 +654,9 @@ void Synchronizer::InitSegment(SharedData* lock) {
 	lock->m_segment_audio_can_drop = true;
 	lock->m_segment_audio_samples_read = 0;
 	lock->m_segment_video_accumulated_delay = 0;
+	// Reset video and audio positions for new segment to prevent frame dropping
+	lock->m_video_pts = 0;
+	lock->m_audio_samples = 0;
 }
 
 int64_t Synchronizer::GetTotalTime(Synchronizer::SharedData* lock) {
@@ -769,10 +772,6 @@ void Synchronizer::FlushVideoBuffer(Synchronizer::SharedData* lock, int64_t segm
 			//Logger::LogInfo("[Synchronizer::FlushVideoBuffer] Dropped video frame [" + QString::number(frame->GetFrame()->pts) + "] acc " + QString::number(lock->m_segment_video_accumulated_delay) + ".");
 			continue;
 		}
-
-		// if this is the first video frame, always set the pts to zero
-		if(lock->m_video_pts == 0)
-			frame->GetFrame()->pts = 0;
 
 		// add new block to sync diagram
 		if(m_sync_diagram != NULL) {
