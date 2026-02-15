@@ -920,7 +920,7 @@ void PageRecord::StartOutput() {
 		} else {
 
 			// start a new segment
-			m_output_manager->GetSynchronizer()->NewSegment();
+			m_output_manager->GetSynchronizer()->NewSegment(false);
 
 		}
 
@@ -997,6 +997,14 @@ void PageRecord::StopOutput(bool final) {
 		m_output_paused = false;
 	}
 	
+	// For pause: first flush remaining data from synchronizer buffers
+	if(!final && m_output_manager && m_output_manager->GetSynchronizer()) {
+		// NewSegment with is_pause=true will flush buffers without increasing time offset
+		m_output_manager->GetSynchronizer()->NewSegment(true);
+		// Then pause to prevent further flushing
+		m_output_manager->GetSynchronizer()->Pause();
+	}
+
 	UpdateSysTray();
 	UpdateRecordButton();
 	UpdateInput();
@@ -1394,6 +1402,10 @@ void PageRecord::OnRecordStart() {
 		// Resume from pause
 		Logger::LogInfo("[PageRecord::OnRecordStart] Resuming from pause");
 		m_output_paused = false;
+		// Resume synchronizer to allow recording again
+		if(m_output_manager && m_output_manager->GetSynchronizer()) {
+			m_output_manager->GetSynchronizer()->Resume();
+		}
 		UpdateSysTray();
 		UpdateRecordButton();
 		UpdateInput();

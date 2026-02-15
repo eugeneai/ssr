@@ -240,6 +240,9 @@ Synchronizer::~Synchronizer() {
 
 void Synchronizer::Init() {
 
+	// initialize paused state
+	m_paused = false;
+
 	// initialize video
 	if(m_output_format->m_video_enabled) {
 		m_max_frames_skipped = (m_output_settings->video_allow_frame_skipping)? (MAX_FRAME_DELAY * m_output_format->m_video_frame_rate + 500000) / 1000000 : 0;
@@ -295,7 +298,7 @@ void Synchronizer::Free() {
 
 }
 
-void Synchronizer::NewSegment() {
+void Synchronizer::NewSegment(bool is_pause) {
 
 	if(m_output_format->m_audio_enabled) {
 		AudioLock audiolock(&m_audio_data);
@@ -303,8 +306,16 @@ void Synchronizer::NewSegment() {
 	}
 
 	SharedLock lock(&m_shared_data);
-	NewSegment(lock.get());
+	NewSegment(lock.get(), is_pause);
 
+}
+
+void Synchronizer::Pause() {
+	m_paused = true;
+}
+
+void Synchronizer::Resume() {
+	m_paused = false;
 }
 
 int64_t Synchronizer::GetTotalTime() {
@@ -620,9 +631,9 @@ double Synchronizer::GetAudioDrift(AudioData* audiolock, unsigned int extra_samp
 	return sample_length - time_length;
 }
 
-void Synchronizer::NewSegment(SharedData* lock) {
+void Synchronizer::NewSegment(SharedData* lock, bool is_pause) {
 	FlushBuffers(lock);
-	if(lock->m_segment_video_started && lock->m_segment_audio_started) {
+	if(!is_pause && lock->m_segment_video_started && lock->m_segment_audio_started) {
 		int64_t segment_start_time, segment_stop_time;
 		GetSegmentStartStop(lock, &segment_start_time, &segment_stop_time);
 		lock->m_time_offset += std::max((int64_t) 0, segment_stop_time - segment_start_time);
@@ -669,7 +680,7 @@ void Synchronizer::GetSegmentStartStop(SharedData* lock, int64_t* segment_start_
 }
 
 void Synchronizer::FlushBuffers(SharedData* lock) {
-	if(!lock->m_segment_video_started || !lock->m_segment_audio_started)
+	if(!lock->m_segment_video_started || !lock->m_segment_audio_started || m_paused)
 		return;
 
 	int64_t segment_start_time, segment_stop_time;
