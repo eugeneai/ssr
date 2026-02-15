@@ -130,6 +130,10 @@ public:
 	// This function is thread-safe.
 	int64_t GetTotalTime();
 
+	// Resets the last video frame data to prevent duplicate frame insertion during pause.
+	// This function is thread-safe.
+	void ResetLastVideoFrame();
+
 	// Returns whether an error has occurred in the synchronizer thread.
 	// This function is thread-safe.
 	inline bool HasErrorOccurred() { return m_error_occurred; }

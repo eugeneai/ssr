@@ -1221,6 +1221,10 @@ void PageRecord::UpdateInput() {
 			m_output_manager->GetSynchronizer()->ConnectVideoSource(video_source, PRIORITY_RECORD);
 			m_output_manager->GetSynchronizer()->ConnectAudioSource(audio_source, PRIORITY_RECORD);
 		} else {
+			// Reset last video frame before disconnecting to prevent duplicate frame insertion during pause
+			if(m_output_manager->GetOutputFormat()->m_video_enabled) {
+				m_output_manager->GetSynchronizer()->ResetLastVideoFrame();
+			}
 			m_output_manager->GetSynchronizer()->ConnectVideoSource(NULL);
 			m_output_manager->GetSynchronizer()->ConnectAudioSource(NULL);
 		}

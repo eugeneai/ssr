@@ -312,6 +312,11 @@ int64_t Synchronizer::GetTotalTime() {
 	return GetTotalTime(lock.get());
 }
 
+void Synchronizer::ResetLastVideoFrame() {
+	SharedLock lock(&m_shared_data);
+	lock->m_last_video_frame_data.reset();
+}
+
 int64_t Synchronizer::GetNextVideoTimestamp() {
 	assert(m_output_format->m_video_enabled);
 	VideoLock videolock(&m_video_data);
@@ -624,6 +629,7 @@ void Synchronizer::NewSegment(SharedData* lock) {
 	}
 	lock->m_video_buffer.clear();
 	lock->m_audio_buffer.Clear();
+	lock->m_last_video_frame_data.reset(); // Reset last video frame data for new segment
 	InitSegment(lock);
 }
 
