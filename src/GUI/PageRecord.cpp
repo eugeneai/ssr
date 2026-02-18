@@ -1425,6 +1425,15 @@ void PageRecord::OnRecordStart() {
 		UpdateRecordButton();
 		UpdateInput();
 		OnUpdateRecordingFrame();
+		
+		// Publish MQTT status for resume
+		if(m_mqtt_client) {
+			m_mqtt_client->PublishRecordingState(true);
+			m_mqtt_client->PublishRecordingEvent("resumed", m_session_id, m_topic);
+			m_mqtt_client->PublishStatus("recording");
+			// Publish full status for centralized architecture
+			m_mqtt_client->PublishFullStatus(true, m_session_id, m_topic);
+		}
 	} else {
 		Logger::LogInfo("[PageRecord::OnRecordStart] Already recording and not paused, doing nothing");
 	}
@@ -1446,13 +1455,10 @@ void PageRecord::OnRecordPause() {
 			.arg(m_output_paused));
 		StopOutput(false);
 		
-		// Publish appropriate MQTT event
-		if(m_mqtt_client) {
-			if(m_output_paused) {
-				m_mqtt_client->PublishRecordingEvent("paused", m_session_id, m_topic);
-			} else {
-				m_mqtt_client->PublishRecordingEvent("resumed", m_session_id, m_topic);
-			}
+		// Publish appropriate MQTT event for pause
+		// Note: Resume event is published in OnRecordStart()
+		if(m_mqtt_client && m_output_paused) {
+			m_mqtt_client->PublishRecordingEvent("paused", m_session_id, m_topic);
 		}
 	}
 }
